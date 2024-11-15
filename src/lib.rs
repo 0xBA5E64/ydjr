@@ -48,7 +48,7 @@ pub fn rename_video(file: PathBuf) -> Result<()> {
 pub fn rename_videos(in_dir: PathBuf) -> Result<()> {
     for entry in
         // Iterator over all (valid) Entries in directory
-        fs::read_dir(in_dir)?
+        fs::read_dir(&in_dir).context(format!("Unable to read directory: {:?}", in_dir))?
             .flatten()
             // Filter for mkv files
             .filter(|x| x.file_name().into_string().unwrap().ends_with(".mkv"))
