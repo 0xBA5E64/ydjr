@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use ytdl_json_renamer::*;
+use ydjr::*;
 
 use clap::Parser;
 
