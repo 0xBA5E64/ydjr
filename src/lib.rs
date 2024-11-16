@@ -1,6 +1,6 @@
 use std::{fs, path::PathBuf};
 
-use anyhow::{Context, Error, Ok, Result};
+use anyhow::{Context, Error, anyhow, Result};
 
 fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value> {
     // Parse the Matroska file
@@ -30,7 +30,7 @@ fn rename_file(file: &PathBuf, new_name: &str) -> Result<()> {
         .context(format!("Unable to rename file {:?}", file))
 }
 
-pub fn rename_video(file: PathBuf) -> Result<()> {
+pub fn rename_video(file: &PathBuf) -> Result<()> {
     // Extract JSON metadata from video-file
     let json: serde_json::Value = extract_json_metadata(&file)?;
 
@@ -46,6 +46,10 @@ pub fn rename_video(file: PathBuf) -> Result<()> {
 }
 
 pub fn rename_videos(in_dir: PathBuf) -> Result<()> {
+    
+    let mut renamed_videos: Vec<PathBuf> = Vec::new();
+    let mut failed_videos: Vec<PathBuf> = Vec::new();
+
     for entry in
         // Iterator over all (valid) Entries in directory
         fs::read_dir(&in_dir).context(format!("Unable to read directory: {:?}", in_dir))?
@@ -55,7 +59,15 @@ pub fn rename_videos(in_dir: PathBuf) -> Result<()> {
             // Unwrap the paths
             .map(|x| x.path())
     {
-        rename_video(entry)?
+        match rename_video(&entry) {
+            Ok(_i)    => renamed_videos.push(entry),
+            Err(_e) => failed_videos.push(entry)
+        }
     }
-    Ok(())
+
+    if failed_videos.len() > 0 {
+        Err(anyhow!(format!("{} files failed at renaming", failed_videos.len())))
+    } else {
+        Ok(())
+    }
 }
