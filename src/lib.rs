@@ -21,7 +21,7 @@ fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value> {
         .context(format!("Unable to parse JSON for file: {:?}", file))
 }
 
-// Renames "file" to "new_name" without changing it's directory
+// Renames "file" to "new_name" without changing its directory
 fn rename_file(file: &PathBuf, new_name: &str) -> Result<()> {
     let mut new_path = file.clone();
     new_path.set_file_name(new_name);
