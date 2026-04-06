@@ -1,6 +1,6 @@
 use std::path::PathBuf;
+use std::io;
 
-use anyhow::Result;
 use ydjr::*;
 
 use clap::Parser;
@@ -12,7 +12,7 @@ struct Args {
     path: String,
 }
 
-fn main() -> Result<()> {
+fn main() -> io::Result<()> {
     let args = Args::parse();
 
     let dir = PathBuf::from(args.path);
