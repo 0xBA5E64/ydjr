@@ -36,7 +36,7 @@ fn rename_file(file: &PathBuf, new_name: &str) -> io::Result<()> {
 
 pub fn rename_video(file: &PathBuf) -> io::Result<()> {
     // Extract JSON metadata from video-file
-    let json: serde_json::Value = extract_json_metadata(&file).unwrap();
+    let json: serde_json::Value = extract_json_metadata(file).unwrap();
 
     // Construct new filename
     let new_filename = format!(
@@ -46,7 +46,7 @@ pub fn rename_video(file: &PathBuf) -> io::Result<()> {
     );
 
     // Finally, rename the file to the right filename.
-    rename_file(&file, &new_filename)
+    rename_file(file, &new_filename)
 }
 
 pub fn rename_videos(in_dir: PathBuf) -> io::Result<()> {
@@ -69,8 +69,8 @@ pub fn rename_videos(in_dir: PathBuf) -> io::Result<()> {
         }
     }
 
-    if failed_videos.len() > 0 {
-        println!("Failed to be rename {} videos.", failed_videos.iter().count());
+    if !failed_videos.is_empty() {
+        println!("Failed to be rename {} videos.", failed_videos.len());
     }
     Ok(())
 }
