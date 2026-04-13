@@ -1,9 +1,9 @@
-use std::path::PathBuf;
-use std::io;
-
-use ydjr::*;
-
 use clap::Parser;
+use sqlx::sqlite::SqliteConnectOptions;
+use sqlx::{migrate, ConnectOptions};
+use std::io;
+use std::path::PathBuf;
+use ydjr::index_videos;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -12,10 +12,21 @@ struct Args {
     path: String,
 }
 
-fn main() -> io::Result<()> {
+#[tokio::main]
+async fn main() -> io::Result<()> {
     let args = Args::parse();
-
     let dir = PathBuf::from(args.path);
 
-    rename_videos(dir)
+    let mut db = SqliteConnectOptions::new()
+        .filename("db.sqlite")
+        .create_if_missing(true)
+        .connect()
+        .await
+        .unwrap();
+
+    migrate!("./migrations").run(&mut db).await.unwrap();
+
+    println!("db: {:?}", db);
+
+    index_videos(dir, &mut db).await
 }
