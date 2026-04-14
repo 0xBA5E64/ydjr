@@ -99,7 +99,7 @@ pub async fn index_videos(in_dir: PathBuf, db: &mut SqliteConnection) -> io::Res
         let video_path = path.display().to_string();
         if let Ok(json) = extract_json_metadata(&path) {
             sqlx::query!(
-                "INSERT INTO videos (video_path, metadata) VALUES (?1, ?2)",
+                "INSERT INTO videos (video_path, metadata) VALUES (?1, jsonb(?2))",
                 video_path,
                 json
             )
