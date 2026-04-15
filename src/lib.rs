@@ -1,5 +1,5 @@
 use sqlx::{Pool, Sqlite};
-use std::{io, path::PathBuf};
+use std::path::PathBuf;
 use thiserror::Error;
 use walkdir::WalkDir;
 
@@ -13,6 +13,14 @@ pub enum ExtractError {
     FindJsonEmbedError,
     #[error("Failed to parse json")]
     JsonParseError,
+}
+
+#[derive(Error, Debug)]
+pub enum IndexError {
+    #[error("Failed to perform database insert")]
+    DatabaseError,
+    #[error("No videos found")]
+    NoVideos,
 }
 
 fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, ExtractError> {
@@ -29,7 +37,7 @@ fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, ExtractErr
     serde_json::from_slice(&json_attachment.data).map_err(|_| ExtractError::JsonParseError)
 }
 
-pub async fn index_videos(in_dir: PathBuf, db_pool: &Pool<Sqlite>) -> io::Result<()> {
+pub async fn index_videos(in_dir: PathBuf, db_pool: &Pool<Sqlite>) -> Result<(), IndexError> {
     let files: Vec<PathBuf> = tokio::task::block_in_place(|| {
         WalkDir::new(&in_dir)
             .follow_links(false)
@@ -45,7 +53,13 @@ pub async fn index_videos(in_dir: PathBuf, db_pool: &Pool<Sqlite>) -> io::Result
             .map(|x| x.path().to_path_buf())
             .collect()
     });
-    println!("Found {} videos.", files.len());
+
+    if files.len() == 0 {
+        return Err(IndexError::NoVideos);
+    } else {
+        println!("Found {} videos.", files.len());
+    }
+
     for path in files {
         let video_path: String = path.to_string_lossy().to_string();
 
@@ -70,7 +84,7 @@ pub async fn index_videos(in_dir: PathBuf, db_pool: &Pool<Sqlite>) -> io::Result
         )
         .execute(db_pool)
         .await
-        .expect("Unable to commit to database");
+        .map_err(|_| IndexError::DatabaseError)?;
     }
 
     Ok(())

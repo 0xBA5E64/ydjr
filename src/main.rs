@@ -1,7 +1,6 @@
 use clap::Parser;
 use sqlx::migrate;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqlitePoolOptions};
-use std::io;
 use std::path::PathBuf;
 use ydjr::index_videos;
 
@@ -13,7 +12,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> io::Result<()> {
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let dir: PathBuf = args.path;
 
@@ -28,7 +27,11 @@ async fn main() -> io::Result<()> {
         .await
         .expect("Unable to establish database connection");
 
-    migrate!("./migrations").run(&db_pool).await.unwrap();
+    migrate!("./migrations")
+        .run(&db_pool)
+        .await
+        .expect("Failed to apply database migrations");
 
-    index_videos(dir, &db_pool).await
+    index_videos(dir, &db_pool).await?;
+    Ok(())
 }
