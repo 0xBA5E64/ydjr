@@ -83,7 +83,7 @@ pub async fn index_videos(in_dir: PathBuf, db_pool: &Pool<Sqlite>) -> Result<(),
         };
 
         sqlx::query!(
-            "INSERT INTO videos (video_path, metadata) VALUES (?1, jsonb(?2))",
+            "INSERT INTO videos (video_path, metadata) VALUES (?1, jsonb(?2)) ON CONFLICT (video_path) DO UPDATE SET metadata=excluded.metadata",
             video_path,
             json
         )
