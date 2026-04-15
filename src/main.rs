@@ -1,6 +1,6 @@
 use clap::Parser;
-use sqlx::sqlite::SqliteConnectOptions;
-use sqlx::{migrate, ConnectOptions};
+use sqlx::migrate;
+use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqlitePoolOptions};
 use std::io;
 use std::path::PathBuf;
 use ydjr::index_videos;
@@ -9,24 +9,26 @@ use ydjr::index_videos;
 #[command(version, about, long_about = None)]
 struct Args {
     /// Location of file/files to rename
-    path: String,
+    path: PathBuf,
 }
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let args = Args::parse();
-    let dir = PathBuf::from(args.path);
+    let dir: PathBuf = args.path;
 
-    let mut db = SqliteConnectOptions::new()
-        .filename("db.sqlite")
-        .create_if_missing(true)
-        .connect()
+    let db_pool = SqlitePoolOptions::new()
+        .max_connections(32)
+        .connect_with(
+            SqliteConnectOptions::new()
+                .filename("db.sqlite")
+                .create_if_missing(true)
+                .auto_vacuum(SqliteAutoVacuum::Incremental),
+        )
         .await
-        .unwrap();
+        .expect("Unable to establish database connection");
 
-    migrate!("./migrations").run(&mut db).await.unwrap();
+    migrate!("./migrations").run(&db_pool).await.unwrap();
 
-    println!("db: {:?}", db);
-
-    index_videos(dir, &mut db).await
+    index_videos(dir, &db_pool).await
 }
