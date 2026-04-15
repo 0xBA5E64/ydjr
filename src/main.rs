@@ -8,19 +8,23 @@ use ydjr::index_videos;
 #[command(version, about, long_about = None)]
 struct Args {
     /// Location of file/files to rename
+    #[arg(default_value = ".")]
     path: PathBuf,
+
+    /// Where the db is
+    #[arg(long, default_value = "./db.sqlite")]
+    db: PathBuf,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    let dir: PathBuf = args.path;
 
     let db_pool = SqlitePoolOptions::new()
         .max_connections(32)
         .connect_with(
             SqliteConnectOptions::new()
-                .filename("db.sqlite")
+                .filename(args.db)
                 .create_if_missing(true)
                 .auto_vacuum(SqliteAutoVacuum::Incremental),
         )
@@ -32,6 +36,6 @@ async fn main() -> anyhow::Result<()> {
         .await
         .expect("Failed to apply database migrations");
 
-    index_videos(dir, &db_pool).await?;
+    index_videos(args.path, &db_pool).await?;
     Ok(())
 }
