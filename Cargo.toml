@@ -1,7 +1,11 @@
 [package]
 name = "ydjr"
 version = "0.1.0"
-edition = "2021"
+description = "CLI utility to ingest embedded json metadata from yt-dlp downloads to a SQLite database file"
+readme = "readme.md"
+repository = "https://github.com/0xBA5E64/ydjr"
+license = "GPLv3"
+edition = "2024"
 
 [dependencies]
 anyhow = "1.0.102"
