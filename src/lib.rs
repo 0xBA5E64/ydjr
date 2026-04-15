@@ -1,3 +1,4 @@
+use indicatif::{ProgressBar, ProgressStyle};
 use sqlx::{Pool, Sqlite};
 use std::path::PathBuf;
 use thiserror::Error;
@@ -54,25 +55,29 @@ pub async fn index_videos(in_dir: PathBuf, db_pool: &Pool<Sqlite>) -> Result<(),
             .collect()
     });
 
-    if files.len() == 0 {
+    if files.is_empty() {
         return Err(IndexError::NoVideos);
-    } else {
-        println!("Found {} videos.", files.len());
     }
+    println!("Found {} videos.", files.len());
+    let bar = ProgressBar::new(files.len().try_into().unwrap());
+    bar.set_style(
+        ProgressStyle::with_template(
+            "[{elapsed_precise} / {duration_precise}] {wide_bar} [{human_pos}/{human_len}]",
+        )
+        .unwrap(),
+    );
 
     for path in files {
         let video_path: String = path.to_string_lossy().to_string();
 
-        println!("Processing video: {}", video_path);
-
         let json: serde_json::Value = match extract_json_metadata(&path) {
             Ok(value) => value,
             Err(error) => {
-                println!(
+                bar.println(format!(
                     "Error, couldn't index \"{}\" - {}",
                     path.to_string_lossy(),
-                    error
-                );
+                    error,
+                ));
                 continue;
             }
         };
@@ -85,7 +90,10 @@ pub async fn index_videos(in_dir: PathBuf, db_pool: &Pool<Sqlite>) -> Result<(),
         .execute(db_pool)
         .await
         .map_err(|_| IndexError::DatabaseError)?;
+
+        bar.inc(1);
     }
 
+    bar.finish();
     Ok(())
 }
