@@ -8,7 +8,6 @@ use ydjr::index_videos;
 #[command(version, about, long_about = None)]
 struct Args {
     /// Location of file/files to rename
-    #[arg(default_value = ".")]
     path: PathBuf,
 
     /// Where to write or open the database file from
