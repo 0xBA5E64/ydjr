@@ -2,7 +2,7 @@ use clap::Parser;
 use sqlx::migrate;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqlitePoolOptions};
 use std::path::PathBuf;
-use ydjr::index_videos;
+use ydjr::index_videos_recursively;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -48,6 +48,6 @@ async fn main() -> anyhow::Result<()> {
         .await
         .expect("Failed to apply database migrations");
 
-    index_videos(args.path, &db_pool, args.headless, multi_progress).await?;
+    index_videos_recursively(args.path, &db_pool, args.headless, multi_progress).await?;
     Ok(())
 }

@@ -18,6 +18,8 @@ pub enum ExtractError {
 
 #[derive(Error, Debug)]
 pub enum IndexError {
+    #[error("Failed to extract metadata")]
+    MetadataExtractionError,
     #[error("Failed to perform database insert")]
     DatabaseError,
     #[error("No videos found")]
@@ -38,7 +40,23 @@ fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, ExtractErr
     serde_json::from_slice(&json_attachment.data).map_err(|_| ExtractError::JsonParseError)
 }
 
-pub async fn index_videos(
+pub async fn index_video(path: &PathBuf, db_pool: &Pool<Sqlite>) -> Result<(), IndexError> {
+    let video_path: String = path.to_string_lossy().to_string();
+
+    let json: serde_json::Value =
+        extract_json_metadata(path).map_err(|_| IndexError::MetadataExtractionError)?;
+    sqlx::query!(
+        "INSERT INTO videos (video_path, metadata) VALUES (?1, jsonb(?2)) ON CONFLICT (video_path) DO UPDATE SET metadata=excluded.metadata",
+        video_path,
+        json
+    )
+    .execute(db_pool)
+    .await
+    .map_err(|_| IndexError::DatabaseError)?;
+    Ok(())
+}
+
+pub async fn index_videos_recursively(
     in_dir: PathBuf,
     db_pool: &Pool<Sqlite>,
     headless_mode: bool,
@@ -63,7 +81,7 @@ pub async fn index_videos(
     if files.is_empty() {
         return Err(IndexError::NoVideos);
     }
-    log::info!("Found {} videos.", files.len());
+    log::info!("Found {} videos to index.", files.len());
 
     let bar = multi_progress.add(ProgressBar::new(files.len().try_into().unwrap()));
 
@@ -77,24 +95,13 @@ pub async fn index_videos(
     }
 
     for path in files {
-        let video_path: String = path.to_string_lossy().to_string();
-
-        let json: serde_json::Value = match extract_json_metadata(&path) {
+        match index_video(&path, db_pool).await {
             Ok(value) => value,
             Err(error) => {
                 log::error!("Couldn't index \"{}\" - {}", path.to_string_lossy(), error);
                 continue;
             }
         };
-
-        sqlx::query!(
-            "INSERT INTO videos (video_path, metadata) VALUES (?1, jsonb(?2)) ON CONFLICT (video_path) DO UPDATE SET metadata=excluded.metadata",
-            video_path,
-            json
-        )
-        .execute(db_pool)
-        .await
-        .map_err(|_| IndexError::DatabaseError)?;
 
         if !headless_mode {
             bar.inc(1);
