@@ -38,7 +38,11 @@ fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, ExtractErr
     serde_json::from_slice(&json_attachment.data).map_err(|_| ExtractError::JsonParseError)
 }
 
-pub async fn index_videos(in_dir: PathBuf, db_pool: &Pool<Sqlite>) -> Result<(), IndexError> {
+pub async fn index_videos(
+    in_dir: PathBuf,
+    db_pool: &Pool<Sqlite>,
+    headless_mode: bool,
+) -> Result<(), IndexError> {
     let files: Vec<PathBuf> = tokio::task::block_in_place(|| {
         WalkDir::new(&in_dir)
             .follow_links(false)
@@ -59,13 +63,17 @@ pub async fn index_videos(in_dir: PathBuf, db_pool: &Pool<Sqlite>) -> Result<(),
         return Err(IndexError::NoVideos);
     }
     println!("Found {} videos.", files.len());
+
     let bar = ProgressBar::new(files.len().try_into().unwrap());
-    bar.set_style(
-        ProgressStyle::with_template(
-            "[{elapsed_precise} / {duration_precise}] {wide_bar} [{human_pos}/{human_len}]",
-        )
-        .unwrap(),
-    );
+
+    if !headless_mode {
+        bar.set_style(
+            ProgressStyle::with_template(
+                "[{elapsed_precise} / {duration_precise}] {wide_bar} [{human_pos}/{human_len}]",
+            )
+            .unwrap(),
+        );
+    }
 
     for path in files {
         let video_path: String = path.to_string_lossy().to_string();
@@ -73,11 +81,16 @@ pub async fn index_videos(in_dir: PathBuf, db_pool: &Pool<Sqlite>) -> Result<(),
         let json: serde_json::Value = match extract_json_metadata(&path) {
             Ok(value) => value,
             Err(error) => {
-                bar.println(format!(
-                    "Error, couldn't index \"{}\" - {}",
+                let msg = format!(
+                    "Error: couldn't index \"{}\" - {}",
                     path.to_string_lossy(),
                     error,
-                ));
+                );
+                if !headless_mode {
+                    bar.println(msg);
+                } else {
+                    println!("{}", msg);
+                }
                 continue;
             }
         };
@@ -91,9 +104,13 @@ pub async fn index_videos(in_dir: PathBuf, db_pool: &Pool<Sqlite>) -> Result<(),
         .await
         .map_err(|_| IndexError::DatabaseError)?;
 
-        bar.inc(1);
+        if !headless_mode {
+            bar.inc(1);
+        }
     }
 
-    bar.finish();
+    if !headless_mode {
+        bar.finish();
+    }
     Ok(())
 }

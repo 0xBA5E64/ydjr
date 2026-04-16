@@ -11,9 +11,13 @@ struct Args {
     #[arg(default_value = ".")]
     path: PathBuf,
 
-    /// Where the db is
+    /// Where to write or open the database file from
     #[arg(long, default_value = "./db.sqlite")]
     db: PathBuf,
+
+    /// Headless mode, fitting if invoked automatically
+    #[arg(long, short = 'H')]
+    headless: bool,
 }
 
 #[tokio::main]
@@ -36,6 +40,6 @@ async fn main() -> anyhow::Result<()> {
         .await
         .expect("Failed to apply database migrations");
 
-    index_videos(args.path, &db_pool).await?;
+    index_videos(args.path, &db_pool, args.headless).await?;
     Ok(())
 }
