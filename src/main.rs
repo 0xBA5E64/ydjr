@@ -23,12 +23,13 @@ struct Args {
 async fn main() -> anyhow::Result<()> {
     let multi_progress = indicatif::MultiProgress::new();
 
-    let logger = env_logger::builder().build();
+    let logger = env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .build();
 
     let logger_wrapper = indicatif_log_bridge::LogWrapper::new(multi_progress.clone(), logger);
 
     logger_wrapper.try_init()?;
-    log::set_max_level(log::LevelFilter::Info);
 
     let args = Args::parse();
 
