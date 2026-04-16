@@ -20,3 +20,17 @@ FROM videos
         metadata->>'duration' DESC
     LIMIT 32;
 ```
+
+## Reasoning for design decisions
+
+### Why not deconstruct the json metadata into database columns?
+The youtube-dl / yt-dlp json metadata schema does not appear to be stable, and as such, **all data could not reliably be serialized into standardized columns**. Different versions of these tools may also have generated and attached different data. Since SQLite makes it trivial to work with json, and in an effort to preserve as much of this data as possible, the whole of the json data is parsed, validated, and inserted into the database.
+
+However, for convenience, it may make sense to offer a [table view](https://sqlite.org/lang_createview.html) that extracts much of the metadata as fields as so ease in querying
+
+### Why SQLite? Why not a Key-value store database? or a document database?
+With the current schema consisting of only two colums: `video_path` & `metadata`, one might argue this job would be a better fit for a Key-value database, like Redis or one of it's many open-source derivatives, or a document database such as MongoDB to better fit the unstructured nature of the json metadata.
+
+However, SQLite is somethat more standardized, and this approach also allows for further expansion into things like adding a mediainfo dump to each colum.
+
+Also, this project is perhaps first and foremost an exercise in SQL for myself, and a fun way to practically begin using a real SQLite database, filled with thousands of rows of real, actual data.
