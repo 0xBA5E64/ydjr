@@ -22,6 +22,15 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let multi_progress = indicatif::MultiProgress::new();
+
+    let logger = env_logger::builder().build();
+
+    let logger_wrapper = indicatif_log_bridge::LogWrapper::new(multi_progress.clone(), logger);
+
+    logger_wrapper.try_init()?;
+    log::set_max_level(log::LevelFilter::Info);
+
     let args = Args::parse();
 
     let db_pool = SqlitePoolOptions::new()
@@ -40,6 +49,6 @@ async fn main() -> anyhow::Result<()> {
         .await
         .expect("Failed to apply database migrations");
 
-    index_videos(args.path, &db_pool, args.headless).await?;
+    index_videos(args.path, &db_pool, args.headless, multi_progress).await?;
     Ok(())
 }

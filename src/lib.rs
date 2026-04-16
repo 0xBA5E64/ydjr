@@ -1,4 +1,4 @@
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use sqlx::{Pool, Sqlite};
 use std::path::PathBuf;
 use thiserror::Error;
@@ -42,6 +42,7 @@ pub async fn index_videos(
     in_dir: PathBuf,
     db_pool: &Pool<Sqlite>,
     headless_mode: bool,
+    multi_progress: MultiProgress,
 ) -> Result<(), IndexError> {
     let files: Vec<PathBuf> = tokio::task::block_in_place(|| {
         WalkDir::new(&in_dir)
@@ -62,9 +63,9 @@ pub async fn index_videos(
     if files.is_empty() {
         return Err(IndexError::NoVideos);
     }
-    println!("Found {} videos.", files.len());
+    log::info!("Found {} videos.", files.len());
 
-    let bar = ProgressBar::new(files.len().try_into().unwrap());
+    let bar = multi_progress.add(ProgressBar::new(files.len().try_into().unwrap()));
 
     if !headless_mode {
         bar.set_style(
@@ -81,16 +82,7 @@ pub async fn index_videos(
         let json: serde_json::Value = match extract_json_metadata(&path) {
             Ok(value) => value,
             Err(error) => {
-                let msg = format!(
-                    "Error: couldn't index \"{}\" - {}",
-                    path.to_string_lossy(),
-                    error,
-                );
-                if !headless_mode {
-                    bar.println(msg);
-                } else {
-                    println!("{}", msg);
-                }
+                log::error!("Couldn't index \"{}\" - {}", path.to_string_lossy(), error);
                 continue;
             }
         };
