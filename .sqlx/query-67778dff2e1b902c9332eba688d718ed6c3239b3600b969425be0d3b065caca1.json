@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO failed_videos (video_path, error) VALUES (?1, ?2) ON CONFLICT (video_path) DO UPDATE SET error=excluded.error",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "67778dff2e1b902c9332eba688d718ed6c3239b3600b969425be0d3b065caca1"
+}

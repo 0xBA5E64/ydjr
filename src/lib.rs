@@ -96,7 +96,20 @@ pub async fn index_videos_recursively(
 
     for path in files {
         if let Err(error) = index_video(&path, db_pool).await {
-            log::error!("Couldn't index \"{}\" - {}", path.to_string_lossy(), error);
+            let path_str = path.to_string_lossy().to_string();
+            let err_str = error.to_string();
+
+            log::error!("Couldn't index \"{}\" - {}", path_str, err_str);
+
+            sqlx::query!(
+                "INSERT INTO failed_videos (video_path, error) VALUES (?1, ?2) ON CONFLICT (video_path) DO UPDATE SET error=excluded.error",
+                path_str,
+                err_str
+            )
+            .execute(db_pool)
+            .await
+            .map_err(|_| IndexError::DatabaseError)?;
+
             continue;
         };
 
