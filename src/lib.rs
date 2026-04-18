@@ -18,8 +18,8 @@ pub enum ExtractError {
 
 #[derive(Error, Debug)]
 pub enum IndexError {
-    #[error("Failed to extract metadata")]
-    MetadataExtractionError,
+    #[error("Error during metadata extraction: {0}")]
+    MetadataExtractionError(ExtractError),
     #[error("Failed to perform database insert")]
     DatabaseError,
     #[error("No videos found")]
@@ -44,7 +44,7 @@ pub async fn index_video(path: &PathBuf, db_pool: &Pool<Sqlite>) -> Result<(), I
     let video_path: String = path.to_string_lossy().to_string();
 
     let json: serde_json::Value =
-        extract_json_metadata(path).map_err(|_| IndexError::MetadataExtractionError)?;
+        extract_json_metadata(path).map_err(IndexError::MetadataExtractionError)?;
     sqlx::query!(
         "INSERT INTO videos (video_path, metadata) VALUES (?1, jsonb(?2)) ON CONFLICT (video_path) DO UPDATE SET metadata=excluded.metadata",
         video_path,
@@ -95,12 +95,9 @@ pub async fn index_videos_recursively(
     }
 
     for path in files {
-        match index_video(&path, db_pool).await {
-            Ok(value) => value,
-            Err(error) => {
-                log::error!("Couldn't index \"{}\" - {}", path.to_string_lossy(), error);
-                continue;
-            }
+        if let Err(error) = index_video(&path, db_pool).await {
+            log::error!("Couldn't index \"{}\" - {}", path.to_string_lossy(), error);
+            continue;
         };
 
         if !headless_mode {
