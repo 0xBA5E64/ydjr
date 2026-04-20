@@ -1,4 +1,5 @@
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use matroska::MatroskaError;
 use sqlx::{Pool, Sqlite};
 use std::path::PathBuf;
 use thiserror::Error;
@@ -6,19 +7,17 @@ use walkdir::WalkDir;
 
 #[derive(Error, Debug)]
 pub enum ExtractError {
-    #[error("Failed to open file")]
-    FileOpenError,
-    #[error("Failed to parse file")]
-    FileParseError,
-    #[error("Failed to find embedded json in file")]
-    FindJsonEmbedError,
-    #[error("Failed to parse json")]
-    JsonParseError,
+    #[error("Failed to open Matroska file: {0}")]
+    MatroskaOpenError(MatroskaError),
+    #[error("Failed to find json attachment")]
+    FindAttachedJsonError,
+    #[error("Failed to parse json: {0}")]
+    JsonParseError(serde_json::Error),
 }
 
 #[derive(Error, Debug)]
 pub enum IndexError {
-    #[error("Error during metadata extraction: {0}")]
+    #[error("Json Extraction Error: {0}")]
     MetadataExtractionError(ExtractError),
     #[error("Failed to perform database insert")]
     DatabaseError,
@@ -28,16 +27,16 @@ pub enum IndexError {
 
 fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, ExtractError> {
     // Parse the Matroska file
-    let matroska = matroska::open(file).map_err(|_| ExtractError::FileParseError)?;
+    let matroska = matroska::open(file).map_err(ExtractError::MatroskaOpenError)?;
     // Find the json attachment
     let json_attachment: matroska::Attachment = matroska
         .attachments
         .into_iter()
         .find(|x| x.name.ends_with(".json"))
-        .ok_or(ExtractError::FindJsonEmbedError)?;
+        .ok_or(ExtractError::FindAttachedJsonError)?;
 
     // Parse it as JSON and return the result
-    serde_json::from_slice(&json_attachment.data).map_err(|_| ExtractError::JsonParseError)
+    serde_json::from_slice(&json_attachment.data).map_err(ExtractError::JsonParseError)
 }
 
 pub async fn index_video(path: &PathBuf, db_pool: &Pool<Sqlite>) -> Result<(), IndexError> {
