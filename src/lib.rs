@@ -1,7 +1,7 @@
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use matroska::MatroskaError;
 use sqlx::{Pool, Sqlite};
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 use thiserror::Error;
 use walkdir::WalkDir;
 
@@ -77,10 +77,30 @@ pub async fn index_videos_recursively(
             .collect()
     });
 
+    log::info!("Found {} videos to index.", files.len());
+
     if files.is_empty() {
         return Err(IndexError::NoVideos);
     }
-    log::info!("Found {} videos to index.", files.len());
+
+    // Get Vec<PathBuf> of all videos already indexed
+    let videos_indexed: Vec<PathBuf> = sqlx::query!("SELECT video_path FROM videos;")
+        .fetch_all(db_pool)
+        .await
+        .unwrap()
+        .iter()
+        .map(|i| PathBuf::from_str(&i.video_path).unwrap())
+        .collect();
+
+    log::info!("DB has {} videos", videos_indexed.len());
+
+    // Filter files form files already found in videos_indexed
+    let files: Vec<&PathBuf> = files
+        .iter()
+        .filter(|x| !videos_indexed.contains(x))
+        .collect();
+
+    log::info!("File-list reduced to {} by comparing to DB.", files.len());
 
     let bar = multi_progress.add(ProgressBar::new(files.len().try_into().unwrap()));
 
@@ -94,7 +114,7 @@ pub async fn index_videos_recursively(
     }
 
     for path in files {
-        if let Err(error) = index_video(&path, db_pool).await {
+        if let Err(error) = index_video(path, db_pool).await {
             let path_str = path.to_string_lossy().to_string();
             let err_str = error.to_string();
 
