@@ -142,3 +142,75 @@ pub async fn index_videos_recursively(
     }
     Ok(())
 }
+
+pub async fn reindex_failed_videos(
+    db_pool: &Pool<Sqlite>,
+    removed_failed: bool,
+    headless_mode: bool,
+    multi_progress: MultiProgress,
+) -> Result<(), IndexError> {
+    // Get Vec<PathBuf> of all videos already indexed
+    let previous_failed: Vec<PathBuf> = sqlx::query!("SELECT video_path FROM failed_videos;")
+        .fetch_all(db_pool)
+        .await
+        .unwrap()
+        .iter()
+        .map(|i| PathBuf::from_str(&i.video_path).unwrap())
+        .collect();
+
+    if previous_failed.is_empty() {
+        return Err(IndexError::NoVideos);
+    }
+
+    log::info!("Found {} previously failed videos.", previous_failed.len());
+
+    let bar = multi_progress.add(ProgressBar::new(previous_failed.len().try_into().unwrap()));
+
+    if !headless_mode {
+        bar.set_style(
+            ProgressStyle::with_template(
+                "[{elapsed_precise} / {duration_precise}] {wide_bar} [{human_pos}/{human_len}]",
+            )
+            .unwrap(),
+        );
+    }
+    for path in previous_failed {
+        let path_str = path.to_string_lossy().to_string();
+        let file_exists = path.try_exists().unwrap_or(false);
+
+        if removed_failed && !file_exists {
+            log::error!("Couldn't find \"{}\" - Removing from Database", path_str);
+            sqlx::query!("DELETE FROM failed_videos WHERE video_path = ?1", path_str)
+                .execute(db_pool)
+                .await
+                .map_err(|_| IndexError::DatabaseError)?;
+            continue;
+        }
+
+        if let Err(error) = index_video(&path, db_pool).await {
+            let err_str = error.to_string();
+
+            log::error!("Couldn't index \"{}\" - {}", path_str, err_str);
+
+            sqlx::query!(
+                "INSERT INTO failed_videos (video_path, error) VALUES (?1, ?2) ON CONFLICT (video_path) DO UPDATE SET error=excluded.error",
+                path_str,
+                err_str
+            )
+            .execute(db_pool)
+            .await
+            .map_err(|_| IndexError::DatabaseError)?;
+            continue;
+        };
+
+        if !headless_mode {
+            bar.inc(1);
+        }
+    }
+
+    if !headless_mode {
+        bar.finish();
+    }
+
+    Ok(())
+}

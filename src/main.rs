@@ -1,15 +1,12 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use sqlx::migrate;
 use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqlitePoolOptions};
 use std::path::PathBuf;
-use ydjr::index_videos_recursively;
+use ydjr::{index_videos_recursively, reindex_failed_videos};
 
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Location of file/files to rename
-    path: PathBuf,
-
     /// Where to write or open the database file from
     #[arg(long, default_value = "./db.sqlite")]
     db: PathBuf,
@@ -17,6 +14,23 @@ struct Args {
     /// Headless mode, fitting if invoked automatically
     #[arg(long, short = 'H')]
     headless: bool,
+
+    #[command(subcommand)]
+    cmd: CmdOption,
+}
+
+#[derive(Subcommand)]
+#[command()]
+enum CmdOption {
+    /// Index a directory into the database
+    #[command(name = "index")]
+    IndexDirectory { path: PathBuf },
+    /// Retry failed indexings found in the database
+    #[command(name = "retry-failed")]
+    ReIndexFailed {
+        #[arg(long, short, default_value = "false")]
+        remove_failed: bool,
+    },
 }
 
 #[tokio::main]
@@ -49,6 +63,13 @@ async fn main() -> anyhow::Result<()> {
         .await
         .expect("Failed to apply database migrations");
 
-    index_videos_recursively(args.path, &db_pool, args.headless, multi_progress).await?;
+    match args.cmd {
+        CmdOption::IndexDirectory { path } => {
+            index_videos_recursively(path, &db_pool, args.headless, multi_progress).await?
+        }
+        CmdOption::ReIndexFailed { remove_failed } => {
+            reindex_failed_videos(&db_pool, remove_failed, args.headless, multi_progress).await?
+        }
+    }
     Ok(())
 }

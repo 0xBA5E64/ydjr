@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT video_path FROM failed_videos;",
+  "describe": {
+    "columns": [
+      {
+        "name": "video_path",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4c74aeeb056982a4397d483c50debec5f1cbab2422ed938c0b437c3b4cef3f95"
+}
