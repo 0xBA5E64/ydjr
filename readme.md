@@ -21,6 +21,14 @@ FROM videos
     LIMIT 32;
 ```
 
+The `video_metadata_view` view can also be queried for simpler overviews:
+
+```sql
+SELECT * FROM video_metadata_view
+    ORDER BY duration DESC
+    LIMIT 32;
+```
+
 ## Reasoning for design decisions
 
 ### Why not deconstruct the json metadata into database columns?
