@@ -7,6 +7,9 @@ repository = "https://github.com/0xBA5E64/ydjr"
 license = "GPLv3"
 edition = "2024"
 
+[profile.release]
+lto = true
+
 [dependencies]
 anyhow = "1.0.102"
 clap = { version = "4.6.1", features = ["derive"] }
