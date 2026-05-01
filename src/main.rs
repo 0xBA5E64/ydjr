@@ -1,3 +1,4 @@
+use anyhow::Context;
 use clap::{Parser, Subcommand};
 use sqlx::migrate;
 use sqlx::sqlite::*;
@@ -65,20 +66,24 @@ async fn main() -> anyhow::Result<()> {
         .expect("Failed to apply database migrations");
 
     match args.cmd {
-        CmdOption::IndexDirectory { path } => {
-            index_videos_recursively(
-                path,
-                &db_pool,
-                args.remove_missing,
-                args.headless,
-                multi_progress,
+        CmdOption::IndexDirectory { path } => index_videos_recursively(
+            path.clone(),
+            &db_pool,
+            args.remove_missing,
+            args.headless,
+            multi_progress,
+        )
+        .await
+        .with_context(|| {
+            format!(
+                "Failed at indexing directory: \"{}\"",
+                path.to_string_lossy()
             )
-            .await?
-        }
+        }),
         CmdOption::ReIndexFailed => {
             reindex_failed_videos(&db_pool, args.remove_missing, args.headless, multi_progress)
-                .await?
+                .await
+                .context("Failed to reindex failed videos")
         }
     }
-    Ok(())
 }
