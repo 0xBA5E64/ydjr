@@ -1,15 +1,19 @@
 use clap::{Parser, Subcommand};
 use sqlx::migrate;
-use sqlx::sqlite::{SqliteAutoVacuum, SqliteConnectOptions, SqlitePoolOptions};
+use sqlx::sqlite::*;
 use std::path::PathBuf;
-use ydjr::{index_videos_recursively, reindex_failed_videos};
+use ydjr::*;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
-struct Args {
+struct YdjrArgs {
     /// Where to write or open the database file from
     #[arg(long, default_value = "./db.sqlite")]
     db: PathBuf,
+
+    /// Remove videos from db if no longer found on filesystem
+    #[arg(long, short, default_value = "false")]
+    remove_missing: bool,
 
     /// Headless mode, fitting if invoked automatically
     #[arg(long, short = 'H')]
@@ -27,10 +31,7 @@ enum CmdOption {
     IndexDirectory { path: PathBuf },
     /// Retry failed indexings found in the database
     #[command(name = "retry-failed")]
-    ReIndexFailed {
-        #[arg(long, short, default_value = "false")]
-        remove_failed: bool,
-    },
+    ReIndexFailed,
 }
 
 #[tokio::main]
@@ -45,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
 
     logger_wrapper.try_init()?;
 
-    let args = Args::parse();
+    let args = YdjrArgs::parse();
 
     let db_pool = SqlitePoolOptions::new()
         .max_connections(32)
@@ -65,10 +66,18 @@ async fn main() -> anyhow::Result<()> {
 
     match args.cmd {
         CmdOption::IndexDirectory { path } => {
-            index_videos_recursively(path, &db_pool, args.headless, multi_progress).await?
+            index_videos_recursively(
+                path,
+                &db_pool,
+                args.remove_missing,
+                args.headless,
+                multi_progress,
+            )
+            .await?
         }
-        CmdOption::ReIndexFailed { remove_failed } => {
-            reindex_failed_videos(&db_pool, remove_failed, args.headless, multi_progress).await?
+        CmdOption::ReIndexFailed => {
+            reindex_failed_videos(&db_pool, args.remove_missing, args.headless, multi_progress)
+                .await?
         }
     }
     Ok(())

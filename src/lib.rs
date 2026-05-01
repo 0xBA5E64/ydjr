@@ -58,7 +58,8 @@ pub async fn index_video(path: &PathBuf, db_pool: &Pool<Sqlite>) -> Result<(), I
 pub async fn index_videos_recursively(
     in_dir: PathBuf,
     db_pool: &Pool<Sqlite>,
-    headless_mode: bool,
+    remove_missing: bool,
+    headless: bool,
     multi_progress: MultiProgress,
 ) -> Result<(), IndexError> {
     let files: Vec<PathBuf> = tokio::task::block_in_place(|| {
@@ -92,6 +93,22 @@ pub async fn index_videos_recursively(
         .map(|i| PathBuf::from_str(&i.video_path).unwrap())
         .collect();
 
+    if remove_missing {
+        for file in &videos_indexed {
+            let path_str = file.to_string_lossy().to_string();
+            let file_exists = file.try_exists().unwrap_or(false);
+
+            if !file_exists {
+                log::error!("Couldn't find \"{}\" - Removing from Database", path_str);
+                sqlx::query!("DELETE FROM failed_videos WHERE video_path = ?1", path_str)
+                    .execute(db_pool)
+                    .await
+                    .map_err(|_| IndexError::DatabaseError)?;
+                continue;
+            }
+        }
+    }
+
     log::info!("DB has {} videos", videos_indexed.len());
 
     // Filter files form files already found in videos_indexed
@@ -104,7 +121,7 @@ pub async fn index_videos_recursively(
 
     let bar = multi_progress.add(ProgressBar::new(files.len().try_into().unwrap()));
 
-    if !headless_mode {
+    if !headless {
         bar.set_style(
             ProgressStyle::with_template(
                 "[{elapsed_precise} / {duration_precise}] {wide_bar} [{human_pos}/{human_len}]",
@@ -114,8 +131,9 @@ pub async fn index_videos_recursively(
     }
 
     for path in files {
+        let path_str = path.to_string_lossy().to_string();
+
         if let Err(error) = index_video(path, db_pool).await {
-            let path_str = path.to_string_lossy().to_string();
             let err_str = error.to_string();
 
             log::error!("Couldn't index \"{}\" - {}", path_str, err_str);
@@ -132,12 +150,12 @@ pub async fn index_videos_recursively(
             continue;
         };
 
-        if !headless_mode {
+        if !headless {
             bar.inc(1);
         }
     }
 
-    if !headless_mode {
+    if !headless {
         bar.finish();
     }
     Ok(())
@@ -145,8 +163,8 @@ pub async fn index_videos_recursively(
 
 pub async fn reindex_failed_videos(
     db_pool: &Pool<Sqlite>,
-    removed_failed: bool,
-    headless_mode: bool,
+    remove_missing: bool,
+    headless: bool,
     multi_progress: MultiProgress,
 ) -> Result<(), IndexError> {
     // Get Vec<PathBuf> of all videos already indexed
@@ -166,7 +184,7 @@ pub async fn reindex_failed_videos(
 
     let bar = multi_progress.add(ProgressBar::new(previous_failed.len().try_into().unwrap()));
 
-    if !headless_mode {
+    if !headless {
         bar.set_style(
             ProgressStyle::with_template(
                 "[{elapsed_precise} / {duration_precise}] {wide_bar} [{human_pos}/{human_len}]",
@@ -178,7 +196,7 @@ pub async fn reindex_failed_videos(
         let path_str = path.to_string_lossy().to_string();
         let file_exists = path.try_exists().unwrap_or(false);
 
-        if removed_failed && !file_exists {
+        if remove_missing && !file_exists {
             log::error!("Couldn't find \"{}\" - Removing from Database", path_str);
             sqlx::query!("DELETE FROM failed_videos WHERE video_path = ?1", path_str)
                 .execute(db_pool)
@@ -203,12 +221,12 @@ pub async fn reindex_failed_videos(
             continue;
         };
 
-        if !headless_mode {
+        if !headless {
             bar.inc(1);
         }
     }
 
-    if !headless_mode {
+    if !headless {
         bar.finish();
     }
 
