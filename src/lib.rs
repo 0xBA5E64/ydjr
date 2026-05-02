@@ -171,7 +171,7 @@ pub async fn reindex_failed_videos(
     let previous_failed: Vec<PathBuf> = sqlx::query!("SELECT video_path FROM failed_videos;")
         .fetch_all(db_pool)
         .await
-        .unwrap()
+        .map_err(|_| IndexError::DatabaseError)?
         .iter()
         .map(|i| PathBuf::from_str(&i.video_path).unwrap())
         .collect();
