@@ -1,5 +1,6 @@
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use matroska::MatroskaError;
+use rsmediainfo::{MediaInfo, MediaInfoError};
 use sqlx::{Pool, Sqlite};
 use std::{path::PathBuf, str::FromStr};
 use thiserror::Error;
@@ -19,6 +20,8 @@ pub enum ExtractError {
 pub enum IndexError {
     #[error("Json Extraction Error: {0}")]
     MetadataExtractionError(ExtractError),
+    #[error("Mediainfo generation Error: {0}")]
+    MediainfoGenerationError(MediaInfoError),
     #[error("Failed to perform database insert")]
     DatabaseError,
     #[error("No videos found")]
@@ -39,15 +42,27 @@ fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, ExtractErr
     serde_json::from_slice(&json_attachment.data).map_err(ExtractError::JsonParseError)
 }
 
+fn get_video_mediainfo(file: &PathBuf) -> Result<serde_json::Value, IndexError> {
+    Ok(serde_json::Value::from(
+        MediaInfo::parse_media_info_path(file)
+            .map_err(IndexError::MediainfoGenerationError)?
+            .to_data(),
+    ))
+}
+
 pub async fn index_video(path: &PathBuf, db_pool: &Pool<Sqlite>) -> Result<(), IndexError> {
     let video_path: String = path.to_string_lossy().to_string();
 
     let json: serde_json::Value =
         extract_json_metadata(path).map_err(IndexError::MetadataExtractionError)?;
+    let mediainfo: serde_json::Value =
+        get_video_mediainfo(path).map_err(|_| IndexError::NoVideos)?;
+
     sqlx::query!(
-        "INSERT INTO videos (video_path, metadata) VALUES (?1, jsonb(?2)) ON CONFLICT (video_path) DO UPDATE SET metadata=excluded.metadata",
+        "INSERT INTO videos (video_path, metadata, mediainfo) VALUES (?1, jsonb(?2), jsonb(?3)) ON CONFLICT (video_path) DO UPDATE SET metadata=excluded.metadata",
         video_path,
-        json
+        json,
+        mediainfo
     )
     .execute(db_pool)
     .await
