@@ -25,7 +25,7 @@ pub enum IndexError {
     NoVideos,
 }
 
-fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, ExtractError> {
+pub fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, ExtractError> {
     // Parse the Matroska file
     let matroska = matroska::open(file).map_err(ExtractError::MatroskaOpenError)?;
     // Find the json attachment

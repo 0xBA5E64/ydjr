@@ -33,6 +33,9 @@ enum CmdOption {
     /// Retry failed indexings found in the database
     #[command(name = "retry-failed")]
     ReIndexFailed,
+    /// Print json metadata of file to console without any indexing
+    #[command(name = "print-json")]
+    PrintJson { path: PathBuf },
 }
 
 #[tokio::main]
@@ -84,6 +87,10 @@ async fn main() -> anyhow::Result<()> {
             reindex_failed_videos(&db_pool, args.remove_missing, args.headless, multi_progress)
                 .await
                 .context("Failed to reindex failed videos")
+        }
+        CmdOption::PrintJson { path } => {
+            println!("{}", extract_json_metadata(&path)?);
+            Ok(())
         }
     }
 }
