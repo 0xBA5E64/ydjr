@@ -269,3 +269,68 @@ pub async fn reindex_failed_videos(
 
     Ok(())
 }
+
+async fn update_mediainfo_in_db(path: &PathBuf, db_pool: &Pool<Sqlite>) -> Result<(), IndexError> {
+    let mediainfo = get_video_mediainfo(path)?;
+    let path_str = path.to_string_lossy().to_string();
+
+    sqlx::query!(
+        "UPDATE videos SET mediainfo = ?1 WHERE video_path = ?2",
+        mediainfo,
+        path_str,
+    )
+    .execute(db_pool)
+    .await
+    .unwrap();
+    Ok(())
+}
+
+pub async fn update_missing_mediainfos(
+    db_pool: &Pool<Sqlite>,
+    headless: bool,
+    multi_progress: MultiProgress,
+) -> Result<(), IndexError> {
+    // Get all videos that don't have any mediainfo in the database
+    let videos_without_mediainfo: Vec<PathBuf> =
+        sqlx::query!("SELECT video_path FROM videos WHERE mediainfo IS NULL;")
+            .fetch_all(db_pool)
+            .await
+            .unwrap()
+            .iter()
+            .map(|i| PathBuf::from_str(&i.video_path).unwrap())
+            .collect();
+
+    // Setup progress bar
+    let bar = multi_progress.add(ProgressBar::new(
+        videos_without_mediainfo.len().try_into().unwrap(),
+    ));
+    if !headless {
+        bar.set_style(
+            ProgressStyle::with_template(
+                "[{elapsed_precise} / {duration_precise}] {wide_bar} [{human_pos}/{human_len}]",
+            )
+            .unwrap(),
+        );
+    }
+
+    // Iterate through all the entries and attempt to add mediainfo
+    for path in videos_without_mediainfo {
+        if let Err(error) = update_mediainfo_in_db(&path, db_pool).await {
+            sqlx::query!(
+                "INSERT INTO failed_videos (video_path, error) VALUES (?1, ?2) ON CONFLICT (video_path) DO UPDATE SET error=excluded.error",
+                path.to_string_lossy().to_string(),
+                error.to_string()
+            ).execute(db_pool).await.unwrap();
+        }
+
+        if !headless {
+            bar.inc(1);
+        }
+    }
+
+    if !headless {
+        bar.finish();
+    }
+
+    Ok(())
+}

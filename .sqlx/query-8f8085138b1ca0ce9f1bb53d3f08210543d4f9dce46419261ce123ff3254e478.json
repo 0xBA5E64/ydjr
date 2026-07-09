@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT video_path FROM videos WHERE mediainfo IS NULL;",
+  "describe": {
+    "columns": [
+      {
+        "name": "video_path",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "videos",
+            "name": "video_path"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8f8085138b1ca0ce9f1bb53d3f08210543d4f9dce46419261ce123ff3254e478"
+}
