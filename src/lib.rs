@@ -1,5 +1,6 @@
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use matroska::MatroskaError;
+use rsmediainfo::{MediaInfo, MediaInfoError};
 use sqlx::migrate;
 use sqlx::sqlite::*;
 use sqlx::{Pool, Sqlite};
@@ -21,6 +22,8 @@ pub enum ExtractError {
 pub enum IndexError {
     #[error("Json Extraction Error: {0}")]
     MetadataExtractionError(ExtractError),
+    #[error("Mediainfo generation Error: {0}")]
+    MediainfoGenerationError(MediaInfoError),
     #[error("Failed to perform database insert")]
     DatabaseError,
     #[error("No videos found")]
@@ -61,15 +64,27 @@ pub fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, Extrac
     serde_json::from_slice(&json_attachment.data).map_err(ExtractError::JsonParseError)
 }
 
+fn get_video_mediainfo(file: &PathBuf) -> Result<serde_json::Value, IndexError> {
+    Ok(serde_json::Value::from(
+        MediaInfo::parse_media_info_path(file)
+            .map_err(IndexError::MediainfoGenerationError)?
+            .to_data(),
+    ))
+}
+
 pub async fn index_video(path: &PathBuf, db_pool: &Pool<Sqlite>) -> Result<(), IndexError> {
     let video_path: String = path.to_string_lossy().to_string();
 
     let json: serde_json::Value =
         extract_json_metadata(path).map_err(IndexError::MetadataExtractionError)?;
+    let mediainfo: serde_json::Value =
+        get_video_mediainfo(path).map_err(|_| IndexError::NoVideos)?;
+
     sqlx::query!(
-        "INSERT INTO videos (video_path, metadata) VALUES (?1, jsonb(?2)) ON CONFLICT (video_path) DO UPDATE SET metadata=excluded.metadata",
+        "INSERT INTO videos (video_path, metadata, mediainfo) VALUES (?1, jsonb(?2), jsonb(?3)) ON CONFLICT (video_path) DO UPDATE SET metadata=excluded.metadata",
         video_path,
-        json
+        json,
+        mediainfo
     )
     .execute(db_pool)
     .await
@@ -242,6 +257,73 @@ pub async fn reindex_failed_videos(
             .map_err(|_| IndexError::DatabaseError)?;
             continue;
         };
+
+        if !headless {
+            bar.inc(1);
+        }
+    }
+
+    if !headless {
+        bar.finish();
+    }
+
+    Ok(())
+}
+
+/// Updates the mediainfo field for a video entry in the database based on their path name
+async fn update_mediainfo_in_db(path: &PathBuf, db_pool: &Pool<Sqlite>) -> Result<(), IndexError> {
+    let mediainfo = get_video_mediainfo(path)?;
+    let path_str = path.to_string_lossy().to_string();
+
+    sqlx::query!(
+        "UPDATE videos SET mediainfo = ?1 WHERE video_path = ?2",
+        mediainfo,
+        path_str,
+    )
+    .execute(db_pool)
+    .await
+    .unwrap();
+    Ok(())
+}
+
+/// This function finds all video entries without mediainfo in the database and amends them with said mediainfo.
+pub async fn amend_empty_mediainfo(
+    db_pool: &Pool<Sqlite>,
+    headless: bool,
+    multi_progress: MultiProgress,
+) -> Result<(), IndexError> {
+    // Get all videos that don't have any mediainfo in the database
+    let videos_without_mediainfo: Vec<PathBuf> =
+        sqlx::query!("SELECT video_path FROM videos WHERE mediainfo IS NULL;")
+            .fetch_all(db_pool)
+            .await
+            .unwrap()
+            .iter()
+            .map(|i| PathBuf::from_str(&i.video_path).unwrap())
+            .collect();
+
+    // Setup progress bar
+    let bar = multi_progress.add(ProgressBar::new(
+        videos_without_mediainfo.len().try_into().unwrap(),
+    ));
+    if !headless {
+        bar.set_style(
+            ProgressStyle::with_template(
+                "[{elapsed_precise} / {duration_precise}] {wide_bar} [{human_pos}/{human_len}]",
+            )
+            .unwrap(),
+        );
+    }
+
+    // Iterate through all the entries and attempt to add mediainfo
+    for path in videos_without_mediainfo {
+        if let Err(error) = update_mediainfo_in_db(&path, db_pool).await {
+            sqlx::query!(
+                "INSERT INTO failed_videos (video_path, error) VALUES (?1, ?2) ON CONFLICT (video_path) DO UPDATE SET error=excluded.error",
+                path.to_string_lossy().to_string(),
+                error.to_string()
+            ).execute(db_pool).await.unwrap();
+        }
 
         if !headless {
             bar.inc(1);

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO videos (video_path, metadata, mediainfo) VALUES (?1, jsonb(?2), jsonb(?3)) ON CONFLICT (video_path) DO UPDATE SET metadata=excluded.metadata",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "bd21b267c5b8032ecdaf6ae94da7ce6ca32091c7dd9785fbc050ff747f51b3d4"
+}

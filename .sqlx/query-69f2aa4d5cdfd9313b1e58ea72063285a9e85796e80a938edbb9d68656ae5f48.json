@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE videos SET mediainfo = ?1 WHERE video_path = ?2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "69f2aa4d5cdfd9313b1e58ea72063285a9e85796e80a938edbb9d68656ae5f48"
+}

@@ -31,6 +31,9 @@ enum CmdOption {
     /// Retry failed indexings found in the database
     #[command(name = "retry-failed")]
     ReIndexFailed,
+    /// Add mediainfo to older entries missing it
+    #[command(name = "add-mediainfo")]
+    AddMediainfo,
     /// Print json metadata of file to console without any indexing
     #[command(name = "print-json")]
     PrintJson { path: PathBuf },
@@ -73,6 +76,12 @@ async fn main() -> anyhow::Result<()> {
             reindex_failed_videos(&db_pool, args.remove_missing, args.headless, multi_progress)
                 .await
                 .context("Failed to reindex failed videos")
+        }
+        CmdOption::AddMediainfo => {
+            let db_pool = initiate_database(args.db).await;
+            amend_empty_mediainfo(&db_pool, args.headless, multi_progress)
+                .await
+                .context("Failed to add mediainfo to older entries")
         }
         CmdOption::PrintJson { path } => {
             println!("{}", extract_json_metadata(&path)?);
