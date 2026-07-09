@@ -57,7 +57,9 @@ pub fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, Extrac
     let json_attachment: matroska::Attachment = matroska
         .attachments
         .into_iter()
-        .find(|x| x.name.ends_with(".json"))
+        // Was unsure if *all* iterations of yt-dl called this file info.json
+        // but querying my own collection seems that way.
+        .find(|x| x.name.eq("info.json"))
         .ok_or(ExtractError::FindAttachedJsonError)?;
 
     // Parse it as JSON and return the result
