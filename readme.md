@@ -42,3 +42,9 @@ With the current schema consisting of only two colums: `video_path` & `metadata`
 However, SQLite is somethat more standardized, and this approach also allows for further expansion into things like adding a mediainfo dump to each colum.
 
 Also, this project is perhaps first and foremost an exercise in SQL for myself, and a fun way to practically begin using a real SQLite database, filled with thousands of rows of real, actual data.
+
+## print-json
+Since retrieving the embedded json data itself isn't typically trivial, ydjr now also comes with a simple helper function called  `print-json` to just print the embedded json of any file. This can then be used in other scripts as well. You may however also wish strip some of the more noisy fields using something like `jq` for easier reading like so:
+```bash
+$ ydjr print-json "video.mkv"|jq 'del(.["thumbnails","formats","automatic_captions"])' 
+```
