@@ -1,5 +1,7 @@
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use matroska::MatroskaError;
+use sqlx::migrate;
+use sqlx::sqlite::*;
 use sqlx::{Pool, Sqlite};
 use std::{path::PathBuf, str::FromStr};
 use thiserror::Error;
@@ -23,6 +25,26 @@ pub enum IndexError {
     DatabaseError,
     #[error("No videos found")]
     NoVideos,
+}
+
+pub async fn initiate_database(db_path: PathBuf) -> sqlx::Pool<Sqlite> {
+    let db_pool = SqlitePoolOptions::new()
+        .max_connections(32)
+        .connect_with(
+            SqliteConnectOptions::new()
+                .filename(db_path)
+                .create_if_missing(true)
+                .auto_vacuum(SqliteAutoVacuum::Incremental),
+        )
+        .await
+        .expect("Unable to establish database connection");
+
+    migrate!("./migrations")
+        .run(&db_pool)
+        .await
+        .expect("Failed to apply database migrations");
+
+    db_pool
 }
 
 pub fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, ExtractError> {
