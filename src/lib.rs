@@ -1,6 +1,8 @@
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use matroska::MatroskaError;
 use rsmediainfo::{MediaInfo, MediaInfoError};
+use sqlx::migrate;
+use sqlx::sqlite::*;
 use sqlx::{Pool, Sqlite};
 use std::{path::PathBuf, str::FromStr};
 use thiserror::Error;
@@ -28,7 +30,27 @@ pub enum IndexError {
     NoVideos,
 }
 
-fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, ExtractError> {
+pub async fn initiate_database(db_path: PathBuf) -> sqlx::Pool<Sqlite> {
+    let db_pool = SqlitePoolOptions::new()
+        .max_connections(32)
+        .connect_with(
+            SqliteConnectOptions::new()
+                .filename(db_path)
+                .create_if_missing(true)
+                .auto_vacuum(SqliteAutoVacuum::Incremental),
+        )
+        .await
+        .expect("Unable to establish database connection");
+
+    migrate!("./migrations")
+        .run(&db_pool)
+        .await
+        .expect("Failed to apply database migrations");
+
+    db_pool
+}
+
+pub fn extract_json_metadata(file: &PathBuf) -> Result<serde_json::Value, ExtractError> {
     // Parse the Matroska file
     let matroska = matroska::open(file).map_err(ExtractError::MatroskaOpenError)?;
     // Find the json attachment
@@ -186,7 +208,7 @@ pub async fn reindex_failed_videos(
     let previous_failed: Vec<PathBuf> = sqlx::query!("SELECT video_path FROM failed_videos;")
         .fetch_all(db_pool)
         .await
-        .unwrap()
+        .map_err(|_| IndexError::DatabaseError)?
         .iter()
         .map(|i| PathBuf::from_str(&i.video_path).unwrap())
         .collect();

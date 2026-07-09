@@ -1,7 +1,5 @@
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use sqlx::migrate;
-use sqlx::sqlite::*;
 use std::path::PathBuf;
 use ydjr::*;
 
@@ -33,6 +31,9 @@ enum CmdOption {
     /// Retry failed indexings found in the database
     #[command(name = "retry-failed")]
     ReIndexFailed,
+    /// Print json metadata of file to console without any indexing
+    #[command(name = "print-json")]
+    PrintJson { path: PathBuf },
 }
 
 #[tokio::main]
@@ -49,41 +50,33 @@ async fn main() -> anyhow::Result<()> {
 
     let args = YdjrArgs::parse();
 
-    let db_pool = SqlitePoolOptions::new()
-        .max_connections(32)
-        .connect_with(
-            SqliteConnectOptions::new()
-                .filename(args.db)
-                .create_if_missing(true)
-                .auto_vacuum(SqliteAutoVacuum::Incremental),
-        )
-        .await
-        .expect("Unable to establish database connection");
-
-    migrate!("./migrations")
-        .run(&db_pool)
-        .await
-        .expect("Failed to apply database migrations");
-
     match args.cmd {
-        CmdOption::IndexDirectory { path } => index_videos_recursively(
-            path.clone(),
-            &db_pool,
-            args.remove_missing,
-            args.headless,
-            multi_progress,
-        )
-        .await
-        .with_context(|| {
-            format!(
-                "Failed at indexing directory: \"{}\"",
-                path.to_string_lossy()
+        CmdOption::IndexDirectory { path } => {
+            let db_pool = initiate_database(args.db).await;
+            index_videos_recursively(
+                path.clone(),
+                &db_pool,
+                args.remove_missing,
+                args.headless,
+                multi_progress,
             )
-        }),
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed at indexing directory: \"{}\"",
+                    path.to_string_lossy()
+                )
+            })
+        }
         CmdOption::ReIndexFailed => {
+            let db_pool = initiate_database(args.db).await;
             reindex_failed_videos(&db_pool, args.remove_missing, args.headless, multi_progress)
                 .await
                 .context("Failed to reindex failed videos")
+        }
+        CmdOption::PrintJson { path } => {
+            println!("{}", extract_json_metadata(&path)?);
+            Ok(())
         }
     }
 }

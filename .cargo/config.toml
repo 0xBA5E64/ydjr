@@ -1,3 +1,0 @@
-# Fix sqlx query checking during development without manually specifying DATABASE_URL each time
-[env]
-DATABASE_URL = "sqlite:db.sqlite"
