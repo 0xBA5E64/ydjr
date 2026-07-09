@@ -122,7 +122,7 @@ pub async fn index_videos_recursively(
 
             if !file_exists {
                 log::error!("Couldn't find \"{}\" - Removing from Database", path_str);
-                sqlx::query!("DELETE FROM failed_videos WHERE video_path = ?1", path_str)
+                sqlx::query!("DELETE FROM videos WHERE video_path = ?1", path_str)
                     .execute(db_pool)
                     .await
                     .map_err(|_| IndexError::DatabaseError)?;

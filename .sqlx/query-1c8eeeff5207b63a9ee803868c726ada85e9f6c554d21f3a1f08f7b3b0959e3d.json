@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM videos WHERE video_path = ?1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "1c8eeeff5207b63a9ee803868c726ada85e9f6c554d21f3a1f08f7b3b0959e3d"
+}
