@@ -115,10 +115,12 @@ pub async fn index_videos_recursively(
             .collect()
     });
 
-    log::info!("Found {} videos to index.", files.len());
+    let files_all_count = files.len();
 
-    if files.is_empty() {
+    if files_all_count == 0 {
         return Err(IndexError::NoVideos);
+    } else {
+        log::info!("Found {} videos to index.", files.len());
     }
 
     // Get Vec<PathBuf> of all videos already indexed
@@ -154,7 +156,16 @@ pub async fn index_videos_recursively(
         .filter(|x| !videos_indexed.contains(x))
         .collect();
 
-    log::info!("File-list reduced to {} by comparing to DB.", files.len());
+    let files_reduced_count = files.len();
+    let files_reduction_size: usize = files_all_count - files.len();
+    let files_reduction_percentage: usize =
+        (((files_reduced_count as f32) / (files_all_count as f32)) * 100_f32) as usize;
+
+    if !files.is_empty() {
+        log::info!(
+            "File-list reduced from {files_all_count} by {files_reduction_size} to {files_reduced_count} ({files_reduction_percentage}%) from comparing to DB."
+        );
+    }
 
     let bar = multi_progress.add(ProgressBar::new(files.len().try_into().unwrap()));
 
