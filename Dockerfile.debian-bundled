@@ -1,0 +1,21 @@
+FROM rust:trixie AS builder
+WORKDIR /usr/src/ydjr
+COPY . .
+# Save rsmediainfo's bundled libmediainfo to a stable path for packaging on #12
+ENV RS_MEDIAINFO_CACHE_DIR=/mediainfo
+RUN cargo install --path .
+
+FROM debian:trixie-slim
+COPY --from=builder /usr/local/cargo/bin/ydjr /usr/local/bin/ydjr
+# rsmediainfo looks for libmediainfo.so.0 next to the executable at runtime.
+# The LICENSE must ship alongside the library (BSD-2-Clause attribution).
+COPY --from=builder /mediainfo/libmediainfo.so.0 /mediainfo/LICENSE /usr/local/bin/
+# Override the compile-time bundled path "RS_MEDIAINFO_LIBRARY_DIR"
+# (which pointed into the builder stage's target/ dir)
+# with the local location we copied the library to.
+ENV RS_MEDIAINFO_LIBRARY_DIR=/usr/local/bin
+# rsmediainfo fails at parsing any files with non-ASCII filenames with the default
+# locale-settings. C.UTF-8 resolves this and comes included in glibc
+ENV LC_ALL=C.UTF-8
+WORKDIR /mnt
+CMD ["ydjr"]

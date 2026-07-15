@@ -1,0 +1,10 @@
+FROM rust:1.97 AS builder
+WORKDIR /usr/src/ydjr
+COPY . .
+RUN cargo install --path .
+
+FROM archlinux/archlinux
+RUN pacman-key --init && pacman -Sy --noconfirm archlinux-keyring && pacman -S --noconfirm libmediainfo
+COPY --from=builder /usr/local/cargo/bin/ydjr /usr/local/bin/ydjr
+WORKDIR /mnt
+CMD ["ydjr"]

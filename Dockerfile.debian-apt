@@ -1,0 +1,11 @@
+FROM rust:trixie AS builder
+WORKDIR /usr/src/ydjr
+COPY . .
+RUN cargo install --path .
+
+FROM debian:trixie-slim
+COPY --from=builder /usr/local/cargo/bin/ydjr /usr/local/bin/ydjr
+RUN apt update && apt install -y libmediainfo0v5 && rm -rf /var/lib/apt/lists/*
+ENV LC_ALL=C.UTF-8
+WORKDIR /mnt
+CMD ["ydjr"]
