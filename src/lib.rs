@@ -21,7 +21,7 @@ pub enum ExtractError {
 #[derive(Error, Debug)]
 pub enum IndexError {
     #[error("Json Extraction Error: {0}")]
-    MetadataExtractionError(ExtractError),
+    MetadataExtractionError(#[from] ExtractError),
     #[error("Mediainfo generation Error: {0}")]
     MediainfoGenerationError(MediaInfoError),
     #[error("Failed to perform database insert")]
@@ -77,16 +77,14 @@ fn get_video_mediainfo(file: &PathBuf) -> Result<serde_json::Value, IndexError> 
 pub async fn index_video(path: &PathBuf, db_pool: &Pool<Sqlite>) -> Result<(), IndexError> {
     let video_path: String = path.to_string_lossy().to_string();
 
-    let json: serde_json::Value =
-        extract_json_metadata(path).map_err(IndexError::MetadataExtractionError)?;
-    let mediainfo: serde_json::Value =
-        get_video_mediainfo(path).map_err(|_| IndexError::NoVideos)?;
+    let metadata_json: serde_json::Value = extract_json_metadata(path)?;
+    let medianfo_json: serde_json::Value = get_video_mediainfo(path)?;
 
     sqlx::query!(
         "INSERT INTO videos (video_path, metadata, mediainfo) VALUES (?1, jsonb(?2), jsonb(?3)) ON CONFLICT (video_path) DO UPDATE SET metadata=excluded.metadata",
         video_path,
-        json,
-        mediainfo
+        metadata_json,
+        medianfo_json
     )
     .execute(db_pool)
     .await
