@@ -11,6 +11,8 @@ All in all, this SQLite database can go on to act as a universal API of sorts to
 > The database that ydjr produces is mainly intended for private usage, where all who may access it are to be trusted. Although [post-2021 versions of yt-dlp may make an effort to clean the infojson of sensitive personal information](https://github.com/yt-dlp/yt-dlp/commit/e4f0275711cd4917bfe819356533926cd369a621), it is worth considering that there may still be personally identifiable information such as usernames in file paths (also saved during mediainfo indexing), system info, and other private information from sessions authenticated with cookies for streams that required credentials, etc., which you may still wish to keep private. 
 
 # good to know
+- ydjr tries to keep external dependencies to a minimum, but at present requires `libmediainfo.so.0` for mediainfo indexing, plus the enviroument variable `LC_ALL` set to `C.UTF-8` for it to support indexing files with non-ascii filenames. As such, both of these are managed by default by the containerized builds for those whom desire a portable solution.
+
 - ydjr is meant to be rerun on the same collection over time to update the database. Along with `--remove-missing` / `-r`, ydjr will cross-reference the videos in the directory you point it to with what it can already find in its current database and only insert (and remove, if specified) entries as needed. ydjr will also automatically perform database migrations when invoked on a pre-existing database to update it to the current schema.
 
 - ydjr (un-)intentionally does not make an opinionated stance about relative versus absolute paths. Whichever way you define the index path parameter is how the `video_path`'s will be saved in your database:
