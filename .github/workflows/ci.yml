@@ -18,6 +18,7 @@ jobs:
     with:
       output: image
       cache: true
+      cache-mode: max
       push: true
       # Thanks to this we no longer have to sanitize the name beforehand:
       # https://github.com/docker/github-builder/pull/169
