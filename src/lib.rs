@@ -132,6 +132,13 @@ pub async fn index_videos_recursively(
         .map(|i| PathBuf::from_str(&i.video_path).unwrap())
         .collect();
 
+    if !videos_indexed.is_empty() {
+        log::info!(
+            "Database currently contains {} videos",
+            videos_indexed.len()
+        );
+    }
+
     if remove_missing {
         for file in &videos_indexed {
             let path_str = file.to_string_lossy().to_string();
@@ -148,8 +155,6 @@ pub async fn index_videos_recursively(
         }
     }
 
-    log::info!("DB has {} videos", videos_indexed.len());
-
     // Filter files form files already found in videos_indexed
     let files: Vec<&PathBuf> = files
         .iter()
@@ -161,9 +166,9 @@ pub async fn index_videos_recursively(
     let files_reduction_percentage: usize =
         (((files_reduced_count as f32) / (files_all_count as f32)) * 100_f32) as usize;
 
-    if !files.is_empty() {
+    if files_reduction_size > 0 {
         log::info!(
-            "File-list reduced from {files_all_count} by {files_reduction_size} to {files_reduced_count} ({files_reduction_percentage}%) from comparing to DB."
+            "File-list reduced from {files_all_count} by {files_reduction_size} to {files_reduced_count} ({files_reduction_percentage}%) after cross-referencing Database."
         );
     }
 
