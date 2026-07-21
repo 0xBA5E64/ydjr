@@ -65,12 +65,16 @@ SELECT * FROM video_metadata_view
 ```
 
 ### developer notes
-To work with this codebase you'll want the `sqlx-cli`, and to initialize a database for the sake of its query checker.
+
+#### sqlx sqlite dx woes
+This codebase uses sqlx to work with its database. sqlx's primary party trick is its "compile-time verification" of database queries. For this to work *during development*, you'll need a working database with the current schema for it to check against. Use `sqlx-cli` to initialize said database: 
 ```bash
 cargo install sqlx-cli
 sqlx database setup -D sqlite:dev.sqlite
 ```
-You may need to restart your rust-analyze server after this
+You may need to restart your rust-analyze server after this, but should now be able to edit/write new queries and have them be checked in real time. Make sure to run `cargo sqlx prepare` to generate query metadata before committing any new queries to the codebase.
+
+When building the app from a blank clone, you must either initiate this database as seen above, or set `SQLX_OFFLINE=true` before attempting to build, to make use of said prepared sqlx query metadata to build without a database.
 
 ## Reasoning for design decisions
 

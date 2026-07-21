@@ -3,10 +3,11 @@ WORKDIR /usr/src/ydjr
 COPY . .
 # Save rsmediainfo's bundled libmediainfo to a stable path for packaging on #12
 ENV RS_MEDIAINFO_CACHE_DIR=/mediainfo
-RUN cargo install --path .
+ENV SQLX_OFFLINE=true
+RUN cargo build --release
 
 FROM debian:trixie-slim
-COPY --from=builder /usr/local/cargo/bin/ydjr /usr/local/bin/ydjr
+COPY --from=builder /usr/src/ydjr/target/release/ydjr /usr/local/bin/ydjr
 # rsmediainfo looks for libmediainfo.so.0 next to the executable at runtime.
 # The LICENSE must ship alongside the library (BSD-2-Clause attribution).
 COPY --from=builder /mediainfo/libmediainfo.so.0 /mediainfo/LICENSE /usr/local/bin/
