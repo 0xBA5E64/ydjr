@@ -7,7 +7,7 @@ use ydjr::*;
 #[command(version, about, long_about = None)]
 struct YdjrArgs {
     /// Where to write or open the database file from
-    #[arg(long, default_value = "./db.sqlite")]
+    #[arg(long, short, default_value = "./db.sqlite")]
     db: PathBuf,
 
     /// Remove videos from db if no longer found on filesystem
