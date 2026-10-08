@@ -29,11 +29,11 @@ All in all, this SQLite database can go on to act as a universal API of sorts to
     yi /home/null/Videos/
     yi /mnt/ext-disk/
     ```
-- ydjr can be used via Docker. This may be useful on a NAS-like systems where a job such as this might get automatically called via a cron-like service.
+- ydjr can be used headlessly via Docker. This may be useful on a NAS-like systems where a job such as this might get automatically called via a cron-like service.
   ```bash
-  docker run --rm -v /path/to/videos:/mnt ghcr.io/0xBA5E64/ydjr ydjr index -hr .
+  docker run --rm -v /path/to/videos:/mnt ghcr.io/0xba5e64/ydjr:main ydjr -rH index .
   ```
-  -replacing `/path/to/videos` with wherever you have videos to index. (`-h` for headless, `-r` to remove videos no longer present on the file-system from the database)
+  -replacing `/path/to/videos` with wherever you have videos to index. (`-H` for headless, `-r` to remove videos no longer present on the file-system from the database)
 
   - If you are looking to index videos stored on remote storage (eg; a SMB Share) you must explicitly specify the location of the database somewhere local:
     ```bash
