@@ -19,4 +19,4 @@ ENV RS_MEDIAINFO_LIBRARY_DIR=/usr/local/bin
 # locale-settings. C.UTF-8 resolves this and comes included in glibc
 ENV LC_ALL=C.UTF-8
 WORKDIR /mnt
-CMD ["ydjr"]
+ENTRYPOINT ["ydjr"]

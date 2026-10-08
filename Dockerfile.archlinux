@@ -8,4 +8,4 @@ FROM archlinux/archlinux
 RUN pacman-key --init && pacman -Sy --noconfirm archlinux-keyring && pacman -S --noconfirm libmediainfo
 COPY --from=builder /usr/src/ydjr/target/release/ydjr /usr/local/bin/ydjr
 WORKDIR /mnt
-CMD ["ydjr"]
+ENTRYPOINT ["ydjr"]
